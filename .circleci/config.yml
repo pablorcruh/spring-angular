@@ -1,0 +1,37 @@
+version: 2
+jobs:
+  build: 
+    docker:
+      - image: springframeworkguru/circleci_build
+    working_directory: ~/repo
+
+    environment:
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            -  v1-dependencies-{{ checksum "build.gradle"}}
+            -  v1-dependencies-
+      - run: gradle dependencies
+      - save_cache:
+          paths:
+            - ~/.m2
+          key: v1-dependencies-{{ checksum "build.gradle"}}
+      - run: ./gradlew clean test 
+      - run:
+          name: Save Test results
+          command: |
+            mkdir -p ~/junit/
+            find . -type -f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
+          when: always
+      - store_test_results:
+          path: ~/junit
+      - store_artifacts:
+          path: ~/junit
+      - setup_remote_docker
+      - run: 
+          name: Build Docker Image
+          command: ./gradlew bootRepackage -Pprod buildDocker
